@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTS Service — Document to Speech</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f0f0f;
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 520px;
+            width: 100%;
+            padding: 24px;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #fff;
+        }
+
+        .subtitle {
+            color: #888;
+            margin-bottom: 32px;
+            font-size: 0.95rem;
+        }
+
+        /* Drop zone */
+        .drop-zone {
+            border: 2px dashed #333;
+            border-radius: 12px;
+            padding: 48px 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 16px;
+        }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: #4a9eff;
+            background: rgba(74, 158, 255, 0.05);
+        }
+
+        .drop-zone-icon {
+            font-size: 2.5rem;
+            margin-bottom: 12px;
+            opacity: 0.6;
+        }
+
+        .drop-zone-text {
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        .drop-zone-text strong {
+            color: #4a9eff;
+        }
+
+        .drop-zone-formats {
+            color: #555;
+            font-size: 0.8rem;
+            margin-top: 8px;
+        }
+
+        .file-name {
+            color: #4a9eff;
+            margin-top: 8px;
+            font-size: 0.9rem;
+            word-break: break-all;
+        }
+
+        /* Voice selector */
+        .voice-select {
+            width: 100%;
+            padding: 10px 14px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-size: 0.9rem;
+            margin-bottom: 16px;
+            appearance: none;
+            cursor: pointer;
+        }
+
+        /* Button */
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: #4a9eff;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn:hover { background: #3a8eef; }
+        .btn:disabled { background: #333; color: #666; cursor: not-allowed; }
+
+        /* Progress */
+        .progress-section {
+            display: none;
+            margin-top: 24px;
+        }
+
+        .progress-section.visible { display: block; }
+
+        .progress-bar-bg {
+            width: 100%;
+            height: 6px;
+            background: #222;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: #4a9eff;
+            border-radius: 3px;
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .progress-text {
+            color: #888;
+            font-size: 0.85rem;
+            text-align: center;
+        }
+
+        /* Download */
+        .download-section {
+            display: none;
+            margin-top: 24px;
+            text-align: center;
+        }
+
+        .download-section.visible { display: block; }
+
+        .btn-download {
+            display: inline-block;
+            padding: 14px 32px;
+            background: #2ecc71;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+
+        .btn-download:hover { background: #27ae60; }
+
+        .download-info {
+            color: #888;
+            font-size: 0.85rem;
+            margin-top: 8px;
+        }
+
+        /* Error */
+        .error-msg {
+            display: none;
+            color: #e74c3c;
+            background: rgba(231, 76, 60, 0.1);
+            border: 1px solid rgba(231, 76, 60, 0.2);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-top: 16px;
+            font-size: 0.9rem;
+        }
+
+        .error-msg.visible { display: block; }
+
+        input[type="file"] { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>TTS Service</h1>
+        <p class="subtitle">Upload a document and get an MP3 narration</p>
+
+        <div class="drop-zone" id="dropZone">
+            <div class="drop-zone-icon">&#128196;</div>
+            <div class="drop-zone-text">
+                Drag & drop file here or <strong>click to browse</strong>
+            </div>
+            <div class="drop-zone-formats">PDF, DOCX, PPTX, TXT</div>
+            <div class="file-name" id="fileName"></div>
+        </div>
+        <input type="file" id="fileInput" accept=".pdf,.docx,.pptx,.txt">
+
+        <select class="voice-select" id="voiceSelect">
+            <option value="ru_RU-irina-medium">Loading voices...</option>
+        </select>
+
+        <button class="btn" id="startBtn" disabled>Generate Audio</button>
+
+        <div class="progress-section" id="progressSection">
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="progressBar"></div>
+            </div>
+            <div class="progress-text" id="progressText">Starting...</div>
+        </div>
+
+        <div class="download-section" id="downloadSection">
+            <a class="btn-download" id="downloadBtn" href="#">Download MP3</a>
+            <div class="download-info" id="downloadInfo"></div>
+        </div>
+
+        <div class="error-msg" id="errorMsg"></div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileName = document.getElementById('fileName');
+        const voiceSelect = document.getElementById('voiceSelect');
+        const startBtn = document.getElementById('startBtn');
+        const progressSection = document.getElementById('progressSection');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const downloadSection = document.getElementById('downloadSection');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const downloadInfo = document.getElementById('downloadInfo');
+        const errorMsg = document.getElementById('errorMsg');
+
+        let selectedFile = null;
+
+        // Load voices
+        fetch('/voices')
+            .then(r => r.json())
+            .then(voices => {
+                voiceSelect.innerHTML = voices
+                    .map(v => `<option value="${v.id}">${v.name}</option>`)
+                    .join('');
+            })
+            .catch(() => {
+                voiceSelect.innerHTML = '<option value="ru_RU-irina-medium">Irina (Russian, medium)</option>';
+            });
+
+        // Drop zone events
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', e => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) {
+                selectFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length) {
+                selectFile(fileInput.files[0]);
+            }
+        });
+
+        function selectFile(file) {
+            selectedFile = file;
+            fileName.textContent = file.name;
+            startBtn.disabled = false;
+            hideError();
+        }
+
+        // Upload and process
+        startBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            startBtn.disabled = true;
+            hideError();
+            downloadSection.classList.remove('visible');
+            progressSection.classList.add('visible');
+            progressBar.style.width = '0%';
+            progressText.textContent = 'Uploading...';
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('voice', voiceSelect.value);
+
+            try {
+                const res = await fetch('/upload', { method: 'POST', body: formData });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || 'Upload failed');
+                }
+
+                const { job_id } = await res.json();
+                pollStatus(job_id);
+            } catch (e) {
+                showError(e.message);
+                startBtn.disabled = false;
+                progressSection.classList.remove('visible');
+            }
+        });
+
+        function pollStatus(jobId) {
+            const interval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/status/${jobId}`);
+                    const data = await res.json();
+
+                    if (data.status === 'processing') {
+                        const pct = data.total_chunks > 0
+                            ? Math.round((data.progress / data.total_chunks) * 100)
+                            : 0;
+                        progressBar.style.width = pct + '%';
+                        progressText.textContent = data.stage;
+                    } else if (data.status === 'completed') {
+                        clearInterval(interval);
+                        progressBar.style.width = '100%';
+                        progressText.textContent = 'Done!';
+
+                        downloadBtn.href = `/download/${jobId}`;
+                        downloadInfo.textContent = data.filename;
+                        downloadSection.classList.add('visible');
+                        startBtn.disabled = false;
+                    } else if (data.status === 'error') {
+                        clearInterval(interval);
+                        progressSection.classList.remove('visible');
+                        showError(data.error || 'An error occurred');
+                        startBtn.disabled = false;
+                    }
+                } catch (e) {
+                    clearInterval(interval);
+                    showError('Connection lost');
+                    startBtn.disabled = false;
+                }
+            }, 1000);
+        }
+
+        function showError(msg) {
+            errorMsg.textContent = msg;
+            errorMsg.classList.add('visible');
+        }
+
+        function hideError() {
+            errorMsg.classList.remove('visible');
+        }
+    </script>
+</body>
+</html>
