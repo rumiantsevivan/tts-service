@@ -84,7 +84,7 @@ def _process_job(job_id: str, filepath: str, voice: Optional[str]):
         text_to_speech(
             text=text,
             output_path=output_path,
-            voice=voice or "ru_RU-irina-medium",
+            voice=voice or "ru-RU-SvetlanaNeural",
             on_progress=on_progress,
         )
 
@@ -153,4 +153,4 @@ app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8765)

@@ -1,5 +1,6 @@
 # Python
 __pycache__/
+*.pyc
 *.py[cod]
 *.egg-info/
 dist/
@@ -7,9 +8,6 @@ build/
 *.egg
 .venv/
 venv/
-
-# Piper binary and models (large files, download separately)
-piper/
 
 # Uploaded files and generated outputs
 uploads/

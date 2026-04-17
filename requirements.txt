@@ -4,4 +4,4 @@ python-multipart==0.0.6
 pymupdf==1.23.7
 python-docx==1.1.0
 python-pptx==0.6.23
-piper-tts==1.2.0
+edge-tts==7.2.8
