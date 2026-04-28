@@ -19,15 +19,58 @@ DEFAULT_VOICE = "ru-RU-SvetlanaNeural"
 # Chunking settings
 MAX_CHUNK_CHARS = 4000
 
+# Russian abbreviations whose periods should NOT terminate a sentence.
+# Matched case-insensitively as whole tokens.
+RU_ABBREVIATIONS = [
+    "т.д", "т.е", "т.п", "т.к", "т.н",
+    "и.о", "т.о",
+    "см", "стр", "табл", "рис", "гл", "ст",
+    "г", "гг", "в", "вв",  # год / годы / век / века
+    "н.э", "до н.э",
+    "проф", "акад", "доц", "канд", "д-р", "ред",
+    "руб", "коп", "тыс", "млн", "млрд",
+    "ул", "пр", "пер", "д", "кв", "обл", "респ",
+    "и др", "и пр", "и т.д", "и т.п",
+]
+# Placeholder: a character unlikely to appear in real text
+_DOT_PLACEHOLDER = "․"  # one-dot leader
+
 
 def get_available_voices() -> list[dict]:
     """Return list of available TTS voices."""
     return VOICES
 
 
+def _protect_abbreviations(text: str) -> str:
+    """Replace dots inside known abbreviations and decimal numbers with placeholders
+    so the sentence splitter doesn't break on them."""
+    # Protect decimal numbers (e.g. 12.5, 3.14)
+    text = re.sub(r"(\d)\.(\d)", rf"\1{_DOT_PLACEHOLDER}\2", text)
+
+    # Protect abbreviations (case-insensitive, word-boundary on the left)
+    for abbr in RU_ABBREVIATIONS:
+        protected = abbr.replace(".", _DOT_PLACEHOLDER) + _DOT_PLACEHOLDER
+        # \b at the start ensures we match whole tokens; require trailing dot
+        pattern = r"(?<![\w" + _DOT_PLACEHOLDER + r"])" + re.escape(abbr) + r"\."
+        text = re.sub(pattern, protected, text, flags=re.IGNORECASE)
+
+    return text
+
+
+def _restore_dots(text: str) -> str:
+    """Restore placeholder dots back to real dots."""
+    return text.replace(_DOT_PLACEHOLDER, ".")
+
+
 def split_into_chunks(text: str, max_chars: int = MAX_CHUNK_CHARS) -> list[str]:
-    """Split text into chunks at sentence boundaries, respecting max_chars limit."""
-    sentences = re.split(r"(?<=[.!?])\s+", text)
+    """Split text into chunks at sentence boundaries, respecting max_chars limit.
+
+    Handles Russian abbreviations (т.д., т.е., и др., etc.) and decimal numbers
+    so they don't trigger spurious sentence breaks.
+    """
+    protected = _protect_abbreviations(text)
+    raw_sentences = re.split(r"(?<=[.!?])\s+", protected)
+    sentences = [_restore_dots(s) for s in raw_sentences]
 
     chunks = []
     current_chunk = ""
