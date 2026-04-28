@@ -1,6 +1,7 @@
 """FastAPI server for TTS service."""
 
 import os
+import time
 import uuid
 import asyncio
 from pathlib import Path
@@ -20,8 +21,41 @@ OUTPUT_DIR = Path(__file__).parent / "outputs"
 UPLOAD_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
 
+# How long to keep generated MP3s and job records (seconds)
+JOB_RETENTION_SECONDS = 24 * 3600  # 24 hours
+
 # In-memory job storage
 jobs: dict[str, dict] = {}
+
+
+def cleanup_stale_files():
+    """Delete files older than JOB_RETENTION_SECONDS from uploads/ and outputs/,
+    and drop the corresponding job records."""
+    cutoff = time.time() - JOB_RETENTION_SECONDS
+
+    for directory in (UPLOAD_DIR, OUTPUT_DIR):
+        for path in directory.iterdir():
+            try:
+                if path.is_file() and path.stat().st_mtime < cutoff:
+                    path.unlink()
+            except OSError:
+                pass
+
+    # Drop in-memory jobs whose output is gone or that are too old
+    stale_ids = []
+    for jid, job in jobs.items():
+        created = job.get("created_at", 0)
+        output = job.get("output_path")
+        if created < cutoff or (output and not os.path.exists(output)):
+            stale_ids.append(jid)
+    for jid in stale_ids:
+        jobs.pop(jid, None)
+
+
+@app.on_event("startup")
+async def on_startup():
+    """Clean up any leftover files from previous runs."""
+    cleanup_stale_files()
 
 
 @app.post("/upload")
@@ -33,6 +67,9 @@ async def upload_file(file: UploadFile = File(...), voice: Optional[str] = None)
             status_code=400,
             detail=f"Unsupported format: {ext}. Supported: {', '.join(SUPPORTED_EXTENSIONS)}",
         )
+
+    # Opportunistic cleanup of stale files on each upload
+    cleanup_stale_files()
 
     job_id = str(uuid.uuid4())
 
@@ -50,6 +87,7 @@ async def upload_file(file: UploadFile = File(...), voice: Optional[str] = None)
         "filename": file.filename,
         "output_path": None,
         "error": None,
+        "created_at": time.time(),
     }
 
     # Run TTS in background
